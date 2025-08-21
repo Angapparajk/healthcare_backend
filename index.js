@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 // Import routes
 const doctorRoutes = require('./Routes/doctors');
 const appointmentRoutes = require('./Routes/appointments');
+const userRoutes = require('./Routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,6 +32,7 @@ mongoose.connect(MONGODB_URI)
 // Routes
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/users', userRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {

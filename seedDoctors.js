@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const Doctor = require('./Schema/doctors'); // Adjust path if needed
+const Doctor = require('./Schema/doctors');
 
 const doctors = [
   {"name":"Dr. Aditi Sharma","specialization":"Cardiologist","email":"aditi.sharma@example.com","phone":"9876543200","profileImage":"https://via.placeholder.com/150","availability":"Available Today"},
