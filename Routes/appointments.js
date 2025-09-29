@@ -77,11 +77,42 @@ router.post('/', emailValidationMiddleware, authMiddleware, async (req, res) => 
     const populatedAppointment = await Appointment.findById(savedAppointment._id).populate('doctorId');
 
     // Send confirmation email to patient
+    const formattedDate = new Date(savedAppointment.appointmentDate).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    // Format time to include AM/PM
+    const formatTime = (timeString) => {
+      const [hours, minutes] = timeString.split(':');
+      const hour24 = parseInt(hours);
+      const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+      const ampm = hour24 >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${minutes} ${ampm}`;
+    };
+    
+    const formattedTime = formatTime(savedAppointment.appointmentTime);
+    
     const mailOptions = {
       from: process.env.GMAIL_USER,
       to: req.user.email,
       subject: 'Appointment Confirmation - NirogGyan Healthcare',
-      text: `Dear ${savedAppointment.patientName},\n\nYour appointment with Dr. ${populatedAppointment.doctorId?.name || '-'} is confirmed.\n\nDate: ${savedAppointment.appointmentDate}\nTime: ${savedAppointment.appointmentTime}\n\nThank you for booking with NirogGyan Healthcare!\n\nRegards,\nNirogGyan Team`
+      text: `Dear ${savedAppointment.patientName},\n\nYour appointment with Dr. ${populatedAppointment.doctorId?.name || '-'} is confirmed.\n\nDate: ${formattedDate}\nTime: ${formattedTime}\n\nThank you for booking with NirogGyan Healthcare!\n\nRegards,\nNirogGyan Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2563eb;">Appointment Confirmation</h2>
+          <p>Dear <strong>${savedAppointment.patientName}</strong>,</p>
+          <p>Your appointment with <strong>Dr. ${populatedAppointment.doctorId?.name || '-'}</strong> is confirmed.</p>
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>📅 Date:</strong> ${formattedDate}</p>
+            <p style="margin: 5px 0;"><strong>🕐 Time:</strong> ${formattedTime}</p>
+          </div>
+          <p>Thank you for booking with NirogGyan Healthcare!</p>
+          <p style="color: #059669;"><strong>Regards,<br>NirogGyan Team</strong></p>
+        </div>
+      `
     };
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
