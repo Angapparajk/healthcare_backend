@@ -4,6 +4,7 @@ const router = express.Router();
 const Appointment = require('../Schema/appointments');
 const Doctor = require('../Schema/doctors');
 const transporter = require('../nodemailer');
+const emailValidationMiddleware = require('../middleware/emailValidation');
 
 // JWT authentication middleware
 const jwt = require('jsonwebtoken');
@@ -43,8 +44,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new appointment
-router.post('/', async (req, res) => {
+// Create new appointment with email validation
+router.post('/', emailValidationMiddleware, authMiddleware, async (req, res) => {
   try {
     // Check if doctor exists
     const doctor = await Doctor.findById(req.body.doctorId);
