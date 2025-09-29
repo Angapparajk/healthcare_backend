@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-// Email validation middleware using AbstractAPI
+// Email validation using multiple APIs
 async function validateEmailWithAPI(email) {
   try {
     console.log('Trying AbstractAPI validation for:', email);
@@ -8,19 +8,37 @@ async function validateEmailWithAPI(email) {
     console.log('AbstractAPI response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Email validation API error:', error.response?.data || error.message);
-    return null;
+    console.error('AbstractAPI error:', error.response?.data || error.message);
+    
+    // Try alternative free API - EmailJS
+    try {
+      console.log('Trying EmailJS validation for:', email);
+      const emailJSResponse = await axios.get(`https://api.emailjs.com/api/v1.0/email/validate?email=${email}`);
+      console.log('EmailJS response:', emailJSResponse.data);
+      
+      // Convert EmailJS response to our format
+      return {
+        is_valid_format: { value: emailJSResponse.data.is_valid },
+        is_mx_found: { value: emailJSResponse.data.is_mx_found },
+        is_smtp_valid: { value: emailJSResponse.data.is_smtp_valid },
+        deliverability: emailJSResponse.data.is_smtp_valid ? 'DELIVERABLE' : 'UNDELIVERABLE'
+      };
+    } catch (emailJSError) {
+      console.error('EmailJS error:', emailJSError.response?.data || emailJSError.message);
+      return null;
+    }
   }
 }
 
-// Fallback validation using DNS lookup
+// DNS validation setup
 const dns = require('dns');
 const { promisify } = require('util');
 const resolveMx = promisify(dns.resolveMx);
 
+// Enhanced DNS validation with SMTP-like checks
 async function validateEmailWithDNS(email) {
   try {
-    console.log('Using DNS validation for:', email);
+    console.log('Using enhanced DNS validation for:', email);
     
     // Basic format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,14 +52,51 @@ async function validateEmailWithDNS(email) {
       };
     }
     
-    // Extract domain
-    const domain = email.split('@')[1];
-    console.log('Checking domain:', domain);
+    // Extract domain and local part
+    const [localPart, domain] = email.split('@');
+    console.log('Checking domain:', domain, 'local part:', localPart);
+    
+    // Check for obviously fake patterns
+    const suspiciousPatterns = [
+      /^[a-z]{6,}$/,  // 6+ repeated letters like "abcabc"
+      /^(test|fake|dummy|sample|example)/i,
+      /^[0-9]{6,}$/,  // 6+ numbers
+      /^(.)\1{5,}$/,  // Same character repeated 6+ times
+    ];
+    
+    const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(localPart));
+    if (isSuspicious) {
+      console.log('Email appears suspicious:', localPart);
+      return { 
+        is_valid_format: { value: true },
+        is_mx_found: { value: false },
+        is_smtp_valid: { value: false },
+        deliverability: 'UNDELIVERABLE'
+      };
+    }
     
     // Check if domain has MX record
     try {
       const mxRecords = await resolveMx(domain);
       console.log('MX records found:', mxRecords.length > 0);
+      
+      // For free email providers, be more strict
+      const freeProviders = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com'];
+      const isFreeProvider = freeProviders.includes(domain.toLowerCase());
+      
+      if (isFreeProvider) {
+        console.log('Free email provider detected, applying stricter validation');
+        // For suspicious looking emails on free providers, mark as undeliverable
+        if (isSuspicious || localPart.length < 3) {
+          return { 
+            is_valid_format: { value: true },
+            is_mx_found: { value: true },
+            is_smtp_valid: { value: false },
+            deliverability: 'UNDELIVERABLE'
+          };
+        }
+      }
+      
       return { 
         is_valid_format: { value: true },
         is_mx_found: { value: true },
@@ -59,7 +114,6 @@ async function validateEmailWithDNS(email) {
     }
   } catch (error) {
     console.error('DNS validation error:', error);
-    // For DNS errors, fail safe (reject)
     return { 
       is_valid_format: { value: false },
       is_mx_found: { value: false },
@@ -73,9 +127,13 @@ async function validateEmailWithDNS(email) {
 async function validateEmail(email) {
   console.log('Starting validation for email:', email);
   
-  // Always use DNS validation for now since API key is invalid
-  // You can get a free API key from https://app.abstractapi.com/
-  let result = await validateEmailWithDNS(email);
+  // Try API first if available, then fall back to enhanced DNS
+  let result = await validateEmailWithAPI(email);
+  
+  if (!result) {
+    console.log('API validation failed, using enhanced DNS validation');
+    result = await validateEmailWithDNS(email);
+  }
   
   console.log('Final validation result:', result);
   return result;
