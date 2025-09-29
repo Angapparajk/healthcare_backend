@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const User = require('../Schema/users');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+// Email verification function
+async function verifyEmail(email) {
+  try {
+    // Replace YOUR_API_KEY with your actual API key from mailboxlayer
+    const response = await axios.get(`https://api.mailboxlayer.com/check?access_key=${process.env.MAILBOXLAYER_API_KEY}&email=${email}`);
+    return response.data;
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return null;
+  }
+}
 
 // Register user
 router.post('/register', async (req, res) => {
@@ -10,6 +23,19 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'All fields are required.' });
     }
+    
+    // Verify email existence
+    const emailVerification = await verifyEmail(email);
+    if (emailVerification && !emailVerification.format_valid) {
+      return res.status(400).json({ message: 'Invalid email format.' });
+    }
+    if (emailVerification && !emailVerification.mx_found) {
+      return res.status(400).json({ message: 'Email domain does not exist.' });
+    }
+    if (emailVerification && !emailVerification.smtp_check) {
+      return res.status(400).json({ message: 'Email address does not exist.' });
+    }
+    
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {

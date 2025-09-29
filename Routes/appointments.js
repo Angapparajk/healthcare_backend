@@ -64,7 +64,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'This time slot is already booked' });
     }
 
-    const appointment = new Appointment(req.body);
+    // Always use logged-in user's email
+    const appointmentData = {
+      ...req.body,
+      patientEmail: req.user.email
+    };
+    const appointment = new Appointment(appointmentData);
     const savedAppointment = await appointment.save();
 
     // Populate doctor info before sending response
@@ -73,7 +78,7 @@ router.post('/', async (req, res) => {
     // Send confirmation email to patient
     const mailOptions = {
       from: process.env.GMAIL_USER,
-      to: savedAppointment.patientEmail,
+      to: req.user.email,
       subject: 'Appointment Confirmation - NirogGyan Healthcare',
       text: `Dear ${savedAppointment.patientName},\n\nYour appointment with Dr. ${populatedAppointment.doctorId?.name || '-'} is confirmed.\n\nDate: ${savedAppointment.appointmentDate}\nTime: ${savedAppointment.appointmentTime}\n\nThank you for booking with NirogGyan Healthcare!\n\nRegards,\nNirogGyan Team`
     };
