@@ -7,8 +7,10 @@ const axios = require('axios');
 // Email verification function
 async function verifyEmail(email) {
   try {
+    console.log('Verifying email:', email);
     // Replace YOUR_API_KEY with your actual API key from mailboxlayer
     const response = await axios.get(`https://api.mailboxlayer.com/check?access_key=${process.env.MAILBOXLAYER_API_KEY}&email=${email}`);
+    console.log('Email verification response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Email verification error:', error);
@@ -26,14 +28,20 @@ router.post('/register', async (req, res) => {
     
     // Verify email existence
     const emailVerification = await verifyEmail(email);
-    if (emailVerification && !emailVerification.format_valid) {
-      return res.status(400).json({ message: 'Invalid email format.' });
-    }
-    if (emailVerification && !emailVerification.mx_found) {
-      return res.status(400).json({ message: 'Email domain does not exist.' });
-    }
-    if (emailVerification && !emailVerification.smtp_check) {
-      return res.status(400).json({ message: 'Email address does not exist.' });
+    console.log('Email verification result:', emailVerification);
+    
+    if (emailVerification) {
+      if (emailVerification.format_valid === false) {
+        return res.status(400).json({ message: 'Invalid email format.' });
+      }
+      if (emailVerification.mx_found === false) {
+        return res.status(400).json({ message: 'Email domain does not exist.' });
+      }
+      if (emailVerification.smtp_check === false) {
+        return res.status(400).json({ message: 'Email address does not exist.' });
+      }
+    } else {
+      console.log('Email verification API failed, proceeding without verification');
     }
     
     // Check if user exists
