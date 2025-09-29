@@ -1,71 +1,7 @@
 const axios = require('axios');
 
-// Email validation using multiple professional APIs
+// Email validation using AbstractAPI only
 async function validateEmailWithAPI(email) {
-  // Method 1: Try Hunter.io Email Verifier (100 free requests/month)
-  try {
-    console.log('Trying Hunter.io validation for:', email);
-    const hunterResponse = await axios.get(`https://api.hunter.io/v2/email-verifier?email=${email}&api_key=${process.env.HUNTER_API_KEY}`);
-    console.log('Hunter.io response:', hunterResponse.data);
-    
-    if (hunterResponse.data && hunterResponse.data.data) {
-      const result = hunterResponse.data.data;
-      return {
-        is_valid_format: { value: result.regexp || false },
-        is_mx_found: { value: result.mx || false },
-        is_smtp_valid: { value: result.smtp_check || false },
-        deliverability: result.result === 'deliverable' ? 'DELIVERABLE' : 'UNDELIVERABLE',
-        confidence: result.score || 0,
-        api_used: 'Hunter.io'
-      };
-    }
-  } catch (error) {
-    console.error('Hunter.io error:', error.response?.data || error.message);
-  }
-
-  // Method 2: Try ZeroBounce API (2000 free credits)
-  try {
-    console.log('Trying ZeroBounce validation for:', email);
-    const zeroBounceResponse = await axios.get(`https://api.zerobounce.net/v2/validate?api_key=${process.env.ZEROBOUNCE_API_KEY}&email=${email}`);
-    console.log('ZeroBounce response:', zeroBounceResponse.data);
-    
-    if (zeroBounceResponse.data) {
-      const result = zeroBounceResponse.data;
-      return {
-        is_valid_format: { value: result.status !== 'invalid' },
-        is_mx_found: { value: result.mx_found || false },
-        is_smtp_valid: { value: ['valid', 'catch-all'].includes(result.status) },
-        deliverability: ['valid', 'catch-all'].includes(result.status) ? 'DELIVERABLE' : 'UNDELIVERABLE',
-        confidence: result.status === 'valid' ? 100 : 0,
-        api_used: 'ZeroBounce'
-      };
-    }
-  } catch (error) {
-    console.error('ZeroBounce error:', error.response?.data || error.message);
-  }
-
-  // Method 3: Try EmailListVerify (1000 free verifications)
-  try {
-    console.log('Trying EmailListVerify validation for:', email);
-    const elvResponse = await axios.get(`https://apps.emaillistverify.com/api/verifyEmail?secret=${process.env.EMAILLISTVERIFY_KEY}&email=${email}`);
-    console.log('EmailListVerify response:', elvResponse.data);
-    
-    if (elvResponse.data) {
-      const isValid = elvResponse.data.status === 'ok';
-      return {
-        is_valid_format: { value: isValid },
-        is_mx_found: { value: isValid },
-        is_smtp_valid: { value: isValid },
-        deliverability: isValid ? 'DELIVERABLE' : 'UNDELIVERABLE',
-        confidence: isValid ? 90 : 0,
-        api_used: 'EmailListVerify'
-      };
-    }
-  } catch (error) {
-    console.error('EmailListVerify error:', error.response?.data || error.message);
-  }
-
-  // Method 4: Try AbstractAPI (if you get a valid key)
   try {
     console.log('Trying AbstractAPI validation for:', email);
     const response = await axios.get(`https://emailvalidation.abstractapi.com/v1/?api_key=${process.env.ABSTRACT_EMAIL_API_KEY}&email=${email}`);
@@ -83,9 +19,8 @@ async function validateEmailWithAPI(email) {
     }
   } catch (error) {
     console.error('AbstractAPI error:', error.response?.data || error.message);
+    return null;
   }
-
-  return null;
 }
 
 // DNS validation setup
@@ -181,20 +116,20 @@ async function validateEmailWithDNS(email) {
   }
 }
 
-// Main email validation function with API priority
+// Main email validation function with AbstractAPI priority
 async function validateEmail(email) {
-  console.log('Starting comprehensive validation for email:', email);
+  console.log('Starting validation for email:', email);
   
-  // Priority 1: Try professional APIs first (most accurate)
+  // Try AbstractAPI first
   let result = await validateEmailWithAPI(email);
   
-  if (result && result.confidence && result.confidence > 50) {
-    console.log(`API validation successful with ${result.api_used}, confidence: ${result.confidence}`);
+  if (result && result.api_used === 'AbstractAPI') {
+    console.log(`AbstractAPI validation successful, confidence: ${result.confidence}`);
     return result;
   }
   
   if (!result) {
-    console.log('All APIs failed, using enhanced DNS validation');
+    console.log('AbstractAPI failed, using enhanced DNS validation');
     result = await validateEmailWithDNS(email);
   }
   
@@ -247,7 +182,7 @@ const emailValidationMiddleware = async (req, res, next) => {
       });
     }
     
-    console.log(`Email validation passed using ${validation.api_used || 'DNS'}`);
+    console.log(`Email validation passed using ${validation.api_used || 'DNS validation'}`);
     // If validation passes, continue to next middleware
     next();
     
